@@ -8,11 +8,13 @@
 - [x] Set up memory bank
 - [x] Write README.md
 
-### Phase 2: Core Implementation [PENDING]
-- [ ] Node<T> abstract base class
-- [ ] Context<T> template class
-- [ ] ContextCache implementation
+### Phase 2: Core Implementation [IN PROGRESS]
+- [x] Node<T> abstract base class
+- [x] Context<T> template class
+- [x] ContextCache implementation
 - [ ] Thread-safe cache with shared_mutex
+- [ ] LLMNode class
+- [ ] CNNNode class
 
 ### Phase 3: Model Specializations [PENDING]
 - [ ] LLMNode class
