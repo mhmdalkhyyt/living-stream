@@ -1,27 +1,27 @@
-# Living Stream - Central Node System
+# Living Stream - AI Model Context Manager
 
-A high-performance C++ application for managing AI model contexts (LLMs, CNNs) with indexed slots and cached context building.
+A Python application for managing AI model contexts (LLMs, CNNs) with indexed slots and cached context building.
 
 ## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────┐
-│           Central Node System               │
+│         Living Stream System                │
 ├─────────────────────────────────────────────┤
 │  ┌─────────────────────────────────────┐    │
-│  │        Context<T> (Built)           │◄───┼── Cacheable, immutable after build
-│  │  - model weights (copied)           │    │
-│  │  - config params (copied)           │    │
-│  │  - metadata (copied)                │    │
+│  │        Context (dataclass)          │◄───┼── Cacheable, copy-on-write
+│  │  - weights (list/numpy)             │    │
+│  │  - config (dict)                    │    │
+│  │  - metadata (dict)                  │    │
 │  │  - Getters/Setters interface        │    │
 │  └─────────────────────────────────────┘    │
 │                    ▲                        │
-│                    │ build()                │
+│                    │ build_context()        │
 │  ┌─────────────────────────────────────┐    │
-│  │      Node<T> (Abstract base)        │    │
+│  │      Node (Abstract Base Class)     │    │
 │  │  - slot index                       │    │
-│  │  - buildContext()                   │    │
-│  │  - asyncBuildContext()              │    │
+│  │  - build_context()                  │    │
+│  │  - async_build_context()            │    │
 │  └─────────────────────────────────────┘    │
 │          │                                  │
 │     ┌────┴────┐                             │
@@ -32,73 +32,120 @@ A high-performance C++ application for managing AI model contexts (LLMs, CNNs) w
 │  └──────┘  └──────┘                         │
 │                                             │
 │  ┌─────────────────────────────────────┐    │
-│  │  ContextCache (LRU/in-memory)       │    │
-│  │  - cacheContext(id, context)        │    │
-│  │  - getCachedContext(id)             │    │
+│  │  ContextCache (LRU, thread-safe)    │    │
+│  │  - cachetools.LRUCache              │    │
+│  │  - threading.RLock                  │    │
+│  └─────────────────────────────────────┘    │
+│                                             │
+│  ┌─────────────────────────────────────┐    │
+│  │  CLI (Interactive)                  │    │
+│  │  - create, build, cache, get        │    │
 │  └─────────────────────────────────────┘    │
 └─────────────────────────────────────────────┘
 ```
 
 ## Key Features
 
-- **Slot-based Storage**: Models indexed in a data structure for O(1) access
-- **Context Building**: Load slot → build context (deep copy)
-- **Caching**: Built contexts cached for reuse
-- **Async Support**: Non-blocking context building with `std::future`
-- **Getter/Setter API**: Encapsulated context access
-- **Type Abstraction**: `Node<T>` base class with `LLMNode`, `CNNNode` specializations
+- **Slot-based Storage**: Models indexed by slot number for O(1) access
+- **Context Building**: Load slot → build context (creates new Context)
+- **Caching**: Built contexts cached for reuse (LRU policy)
+- **Async Support**: Non-blocking context building with `asyncio`
+- **Getter/Setter API**: Encapsulated context access with copies
+- **Type Abstraction**: `Node` base class with `LLMNode`, `CNNNode` specializations
+- **Interactive CLI**: Full command-line interface for testing
 
 ## Design Decisions
 
-- **No PyTorch tensors** for storage (too much overhead for model registry)
-- **Deep copy** context building for thread safety
-- **Immutable cached contexts** with `std::shared_ptr<const Context<T>>`
-- **Thread-safe cache** using `std::shared_mutex`
+- **Python dataclasses** for clean Context structure
+- **cachetools.LRUCache** for reliable caching
+- **threading.RLock** for thread-safe cache access
+- **asyncio** for async operations
+- **numpy** optional for efficient array operations
 
 ## Project Structure
 
 ```
 living-stream/
 ├── README.md
-├── CMakeLists.txt
-├── src/
-│   ├── core/
-│   │   ├── Node.hpp
-│   │   ├── Context.hpp
-│   │   └── ContextCache.hpp
-│   ├── models/
-│   │   ├── LLMNode.hpp
-│   │   └── CNNNode.hpp
-│   └── main.cpp
-├── include/
-└── memory-bank/
-    ├── project-vision.md
-    ├── system-architecture.md
-    ├── active-context.md
-    ├── progress.md
-    └── lessons-learned.md
+├── python/
+│   ├── __init__.py
+│   ├── node.py           (Abstract Node class)
+│   ├── context.py        (Context dataclass)
+│   ├── context_cache.py  (Thread-safe LRU cache)
+│   ├── llm_node.py       (LLM specialization)
+│   ├── cnn_node.py       (CNN specialization)
+│   ├── cli.py            (Interactive CLI)
+│   └── requirements.txt
+├── memory-bank/
+│   ├── project-vision.md
+│   ├── system-architecture.md
+│   ├── active-context.md
+│   ├── progress.md
+│   └── lessons-learned.md
 ```
 
-## Memory Bank
-
-The `memory-bank/` directory contains:
-- `project-vision.md` - Core purpose and goals
-- `system-architecture.md` - Detailed technical design
-- `active-context.md` - Current work state
-- `progress.md` - Milestones and achievements
-- `lessons-learned.md` - Development insights
-
-## Building
+## Installation
 
 ```bash
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build .
+cd python
+pip install -r requirements.txt
 ```
 
 ## Usage
 
-See source files for API usage examples.
+### Interactive CLI
+
+```bash
+cd python
+python cli.py
+```
+
+Commands:
+```
+> create llm 0              # Create LLM at slot 0
+> create cnn 1              # Create CNN at slot 1
+> cache 0                   # Build and cache context
+> get 0                     # Retrieve cached context
+> build-async 1             # Build asynchronously
+> list                      # List cached contexts
+> status                    # Show system status
+> help                      # Show all commands
+> quit                      # Exit
+```
+
+### Programmatic Usage
+
+```python
+from llm_node import LLMNode
+from cnn_node import CNNNode
+from context_cache import ContextCache
+
+# Create nodes
+llm = LLMNode(slot_index=0, model_path="models/llm.bin")
+cnn = CNNNode(slot_index=1, model_path="models/cnn.bin")
+
+# Build contexts
+context = llm.build_context()
+print(f"Weights: {len(context.get_weights())}")
+
+# Use cache
+cache = ContextCache(max_size=100)
+cache.cache_context(0, context)
+cached = cache.get_cached_context(0)
+
+# Async building
+import asyncio
+async def main():
+    context = await llm.async_build_context()
+
+asyncio.run(main())
+```
+
+## Dependencies
+
+- Python 3.8+
+- numpy >= 1.20.0
+- cachetools >= 5.0.0
 
 ## License
 

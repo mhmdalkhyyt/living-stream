@@ -1,6 +1,6 @@
 # Project Vision
 
-**Living Stream** - A high-performance C++ central node system for managing AI model contexts.
+**Living Stream** - A Python-based central node system for managing AI model contexts.
 
 ## Core Purpose
 
@@ -8,18 +8,19 @@ Create a system that:
 - Stores AI models (LLMs, CNNs) in an indexed slot data structure
 - Builds context from model slots on demand
 - Caches built contexts for fast retrieval
-- Supports async context building
+- Supports async context building via asyncio
 - Provides clean getter/setter API for context access
 
 ## Goals
 
-1. **Performance First**: Prioritize speed over convenience
-2. **Type Abstraction**: Generic `Node<T>` base with specialized implementations
-3. **Thread Safety**: Safe concurrent access to cached contexts
-4. **No Overhead**: Avoid heavy dependencies like PyTorch for storage
+1. **Simplicity First**: Clean Python code over complex C++ patterns
+2. **Type Abstraction**: Abstract `Node` base class with specialized implementations
+3. **Thread Safety**: Safe concurrent access using threading.RLock
+4. **Standard Library**: Use standard libraries and well-maintained packages (cachetools, numpy)
 
 ## Anti-Goals
 
-- No PyTorch tensors for model storage (too much overhead)
-- No zero-copy semantics (explicit deep copy for safety)
+- No heavy ML frameworks (PyTorch, TensorFlow) for storage
+- No complex async patterns (keep it simple with asyncio)
 - No complex dependency chains
+- No monolithic single-file implementations
