@@ -1,0 +1,91 @@
+# Living Stream Configuration File
+# Version: 1.0
+
+# Default settings applied to all environments
+defaults:
+  storage:
+    directory: "./storage"
+    cache_size: 1000
+
+# Environment-specific overrides
+environments:
+  dev:
+    storage:
+      directory: "./storage/dev"
+      cache_size: 500
+
+  staging:
+    storage:
+      directory: "./storage/staging"
+      cache_size: 2000
+
+  production:
+    storage:
+      directory: "./storage/prod"
+      cache_size: 5000
+
+# Node definitions
+# Each node must have a unique slot number and a type (llm or cnn)
+nodes:
+  # Root LLM node - serves as parent for others
+  - slot: 1
+    type: llm
+    name: "gpt-style-model"
+    config:
+      temperature: 0.7
+      top_p: 0.9
+      max_tokens: 2048
+    parent: null  # null = root node
+    groups: ["production", "llm-models"]
+
+  # Child CNN node - inherits parent relationship
+  - slot: 2
+    type: cnn
+    name: "image-classifier"
+    config:
+      kernel_size: 3
+      stride: 1
+      padding: 1
+      activation: "relu"
+    parent: 1  # Parent slot number
+    groups: ["experiments"]
+
+  # Another LLM node - root level
+  - slot: 3
+    type: llm
+    name: "text-generator"
+    config:
+      temperature: 0.8
+      top_p: 0.95
+      max_tokens: 1024
+    parent: null
+    groups: ["production", "llm-models", "fast-models"]
+
+  # Another CNN node
+  - slot: 4
+    type: cnn
+    name: "feature-extractor"
+    config:
+      kernel_size: 5
+      stride: 2
+      padding: 2
+      activation: "tanh"
+    parent: 1
+    groups: ["experiments", "feature-extraction"]
+
+# Group definitions with descriptions
+groups:
+  production:
+    description: "Production-ready models for live use"
+
+  experiments:
+    description: "Experimental models under development"
+
+  llm-models:
+    description: "Large Language Model nodes"
+
+  fast-models:
+    description: "Low-latency models for real-time inference"
+
+  feature-extraction:
+    description: "Models for extracting image features"

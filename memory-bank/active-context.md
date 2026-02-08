@@ -1,7 +1,7 @@
 # Active Context
 
 ## Current Phase
-Persistent storage layer implemented with hybrid SQLite + numpy design.
+Phase 7: Configuration File Support - COMPLETED
 
 ## Tasks In Progress
 - [x] Define project vision (updated for Python)
@@ -16,12 +16,32 @@ Persistent storage layer implemented with hybrid SQLite + numpy design.
   - [x] Interactive CLI
 - [x] Add persistent storage layer (PersistentStore)
 - [x] Add 29 unit tests for storage
+- [x] Implement NodeHierarchy class
+- [x] Add parent-child hierarchy to Node class
+- [x] Add group membership to Node class
+- [x] Add hierarchy/group REST API endpoints
+- [x] Create comprehensive unit tests for NodeHierarchy
+- [x] Add hierarchy tests to API server tests
+- [x] Run and verify all tests pass
+- [x] **Add configuration file support (Phase 7)**
+  - [x] Config module with YAML loading
+  - [x] Environment support (dev/staging/production)
+  - [x] CLI config arguments (--config, --env, --validate)
+  - [x] API config endpoints (/config/status, /config/reload)
+  - [x] Hot-reload in dev mode
+  - [x] 25+ config unit tests
 
 ## Next Steps
+- [ ] Run all tests to verify config implementation
 - [ ] Add async context building examples
 - [ ] Consider actual model loading (PyTorch integration optional)
-- [ ] Add configuration file support
 - [ ] Performance benchmarks for storage layer
+- [ ] Update README with config documentation
+
+## Documentation
+- See `memory-bank/node-hierarchy.md` for complete hierarchy documentation
+- See `memory-bank/config.md` for config documentation (to be added)
+- Includes API endpoints, usage examples, and architecture details
 
 ## Decisions Made
 1. **Storage Architecture**: Hybrid SQLite + numpy files
@@ -44,27 +64,43 @@ Persistent storage layer implemented with hybrid SQLite + numpy design.
    - Thread-local SQLite connections
    - Atomic file operations
 
+5. **Configuration Design**:
+   - YAML format with comments support
+   - Multi-environment in same file (defaults + environments overrides)
+   - Warn on unknown keys (continue with logging)
+   - Hot-reload endpoint in dev mode only
+
 ## Storage Performance Characteristics
 - SQLite metadata query: 0.1-1ms (indexed)
 - numpy.load(mmap_mode='r'): 1-10ms (OS handles paging)
 - Concurrent reads: Unlimited (OS file cache)
 - Atomic write: 5-20ms (DB + numpy save)
 
-## Usage Example
-```python
-from python.storage import PersistentStore
-from python.context import Context
+## Configuration Usage Examples
 
-# Create store
-store = PersistentStore(storage_dir="my_storage")
+### CLI
+```bash
+# Load config and start
+python -m python.cli --config examples/basic-config.yaml
 
-# Save context
-context = Context(weights=[1.0, 2.0, 3.0], config={"temp": 0.7})
-store.save_context(1, context)
+# Use different environment
+python -m python.cli --config examples/basic-config.yaml --env production
 
-# Load context (memory-mapped for fast access)
-loaded = store.load_context(1)
+# Validate config without running
+python -m python.cli --config examples/basic-config.yaml --validate
+```
 
-# Multiple readers can access same slot concurrently
-# Writer updates atomically without blocking readers
+### API Server
+```bash
+# Start with config
+uvicorn python.api_server:app --reload -- --config examples/basic-config.yaml
+
+# Production mode (no hot-reload)
+uvicorn python.api_server:app -- --config examples/basic-config.yaml --production
+```
+
+### API Endpoints
+```
+GET  /config/status    # Show current config
+POST /config/reload    # Hot-reload config (dev only)
 ```

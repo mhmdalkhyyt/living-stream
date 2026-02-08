@@ -115,3 +115,67 @@
 - Generates synthetic CNN layer weights
 - Config: kernel_size, stride, padding, activation
 - Location: `python/cnn_node.py`
+
+### NodeHierarchy
+- **Purpose**: Manages parent-child hierarchy and group memberships for nodes
+- **Storage**: In-memory only (not persisted)
+- **Key Methods**:
+  - `set_parent(child_id, parent_id)` - Set parent with cycle detection
+  - `get_parent(slot_id)` - Get parent slot
+  - `get_children(slot_id)` - Get all children
+  - `get_ancestors(slot_id)` - Get ancestry path (root to node)
+  - `get_descendants(slot_id)` - Get all descendants (subtree)
+  - `move_node(slot_id, new_parent)` - Move node to new parent
+  - `add_to_group(slot_id, group_name)` - Add to group
+  - `remove_from_group(slot_id, group_name)` - Remove from group
+  - `get_groups(slot_id)` - Get all groups for node
+  - `list_by_group(group_name)` - List all nodes in group
+- **Thread Safety**: Uses `threading.RLock`
+- **Features**:
+  - Cycle detection prevents invalid parent relationships
+  - Many-to-many group memberships
+  - Tree statistics (depth, root count, etc.)
+- **Location**: `python/node_hierarchy.py`
+
+## Node Hierarchy & Groups
+
+### Parent-Child Hierarchy
+```
+        [Root 1]                    [Root 2]
+          /   \                         |
+     [Child 1] [Child 2]           [Child 3]
+          |
+     [Grandchild 1]
+```
+- Each node has at most one parent
+- Multiple children per parent allowed
+- Cycle detection prevents A->B->A patterns
+
+### Group Membership
+```
+Group "production": {slot 1, slot 3, slot 5}
+Group "experiments": {slot 2, slot 4}
+Group "llms":       {slot 1, slot 2}
+```
+- Nodes can belong to multiple groups
+- Groups can contain multiple nodes
+- Many-to-many relationship
+
+### API Endpoints
+
+**Hierarchy Operations:**
+- `POST /nodes/{slot}/parent` - Set parent (null for root)
+- `GET /nodes/{slot}/parent` - Get parent
+- `GET /nodes/{slot}/children` - Get children
+- `GET /nodes/{slot}/ancestors` - Get ancestry path
+- `GET /nodes/{slot}/descendants` - Get subtree
+- `GET /nodes/{slot}/root` - Get root of tree
+- `GET /nodes/{slot}/hierarchy` - Full hierarchy info
+- `GET /hierarchy/stats` - Hierarchy statistics
+
+**Group Operations:**
+- `POST /nodes/{slot}/groups` - Add to group
+- `DELETE /nodes/{slot}/groups/{name}` - Remove from group
+- `GET /nodes/{slot}/groups` - Get node's groups
+- `GET /groups` - List all groups
+- `GET /groups/{name}` - List group members

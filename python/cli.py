@@ -3,6 +3,7 @@
 
 import sys
 import os
+import argparse
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,6 +13,8 @@ from .llm_node import LLMNode
 from .cnn_node import CNNNode
 from .context_cache import ContextCache
 from .context import Context
+from .node_hierarchy import NodeHierarchy
+from .config import add_config_args, apply_config_to_cli, load_config
 
 
 def print_help() -> None:
@@ -285,10 +288,238 @@ async def run_cli() -> None:
         print("Type 'help' for available commands.")
 
 
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Living Stream - AI Model Context Manager",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python -m python.cli                    # Start interactive CLI
+  python -m python.cli --config config.yaml     # Load from config file
+  python -m python.cli --config config.yaml --validate  # Validate config only
+  python -m python.cli --config config.yaml --env dev   # Use dev environment
+        """
+    )
+    
+    add_config_args(parser)
+    
+    return parser.parse_args()
+
+
+async def run_cli_with_config(args) -> None:
+    """Run CLI with optional config loading."""
+    print("Living Stream - AI Model Context Manager")
+    print("=========================================\n")
+    
+    # Global storage for created nodes
+    nodes: Dict[int, Union[LLMNode, CNNNode]] = {}
+    
+    # Cache for built contexts
+    cache = ContextCache()
+    
+    # Hierarchy manager
+    hierarchy = NodeHierarchy()
+    
+    # Apply config if provided
+    if args.config:
+        result = apply_config_to_cli(args, nodes, hierarchy)
+        if result == "VALIDATED":
+            # Just validated, exit
+            return
+        elif result:
+            print(f"Error: {result}")
+            return
+    
+    if not nodes:
+        print("Type 'help' for available commands.\n")
+    
+    while True:
+        try:
+            line = input("> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nGoodbye!")
+            break
+        
+        if not line:
+            continue
+        
+        parts = line.split()
+        command = parts[0].lower()
+        
+        if command in ("quit", "exit"):
+            print("Goodbye!")
+            break
+        
+        if command == "help":
+            print_help()
+            continue
+        
+        if command == "create":
+            if len(parts) < 3:
+                print("Usage: create <llm|cnn> <slot> [path]")
+                continue
+            
+            type_str = parts[1]
+            try:
+                slot = int(parts[2])
+            except ValueError:
+                print("Invalid slot number")
+                continue
+            
+            path = parts[3] if len(parts) > 3 else "models/default.bin"
+            
+            if type_str == "llm":
+                nodes[slot] = LLMNode(slot, path)
+                print(f"Created LLMNode at slot {slot} (path: {path})")
+            elif type_str == "cnn":
+                nodes[slot] = CNNNode(slot, path)
+                print(f"Created CNNNode at slot {slot} (path: {path})")
+            else:
+                print(f"Unknown type: {type_str} (use 'llm' or 'cnn')")
+            continue
+        
+        if command == "build":
+            if len(parts) < 2:
+                print("Usage: build <slot>")
+                continue
+            
+            try:
+                slot = int(parts[1])
+            except ValueError:
+                print("Invalid slot number")
+                continue
+            
+            if slot not in nodes:
+                print(f"No node at slot {slot}. Use 'create' first.")
+                continue
+            
+            context = nodes[slot].build_context()
+            print(f"Built context for slot {slot}:")
+            print_context_info("Context", context)
+            continue
+        
+        if command == "build-async":
+            if len(parts) < 2:
+                print("Usage: build-async <slot>")
+                continue
+            
+            try:
+                slot = int(parts[1])
+            except ValueError:
+                print("Invalid slot number")
+                continue
+            
+            if slot not in nodes:
+                print(f"No node at slot {slot}. Use 'create' first.")
+                continue
+            
+            print("Building context asynchronously...")
+            context = await nodes[slot].async_build_context()
+            print(f"Async build complete for slot {slot}:")
+            print_context_info("Context", context)
+            continue
+        
+        if command == "cache":
+            if len(parts) < 2:
+                print("Usage: cache <slot>")
+                continue
+            
+            try:
+                slot = int(parts[1])
+            except ValueError:
+                print("Invalid slot number")
+                continue
+            
+            if slot not in nodes:
+                print(f"No node at slot {slot}. Use 'create' first.")
+                continue
+            
+            context = nodes[slot].build_context()
+            cache.cache_context(slot, context)
+            print(f"Cached context for slot {slot}")
+            continue
+        
+        if command == "get":
+            if len(parts) < 2:
+                print("Usage: get <slot>")
+                continue
+            
+            try:
+                slot = int(parts[1])
+            except ValueError:
+                print("Invalid slot number")
+                continue
+            
+            if slot not in cache:
+                print(f"No cached context at slot {slot}. Use 'cache' first.")
+                continue
+            
+            context = cache.get_cached_context(slot)
+            print(f"Retrieved cached context for slot {slot}:")
+            print_context_info("Context", context)
+            continue
+        
+        if command == "remove":
+            if len(parts) < 2:
+                print("Usage: remove <slot>")
+                continue
+            
+            try:
+                slot = int(parts[1])
+            except ValueError:
+                print("Invalid slot number")
+                continue
+            
+            if cache.remove_context(slot):
+                print(f"Removed cached context at slot {slot}")
+            else:
+                print(f"No cached context at slot {slot}")
+            continue
+        
+        if command == "clear":
+            cache.clear()
+            print("Cleared all cached contexts")
+            continue
+        
+        if command == "list":
+            print(f"Cached contexts ({cache.size()}):")
+            for slot in range(100):
+                if slot in cache:
+                    print(f"  Slot {slot} (LRU)")
+            continue
+        
+        if command == "info":
+            if len(parts) < 2:
+                print("Usage: info <slot>")
+                continue
+            
+            try:
+                slot = int(parts[1])
+            except ValueError:
+                print("Invalid slot number")
+                continue
+            
+            if slot not in nodes:
+                print(f"No node at slot {slot}")
+                continue
+            
+            print_node_info(slot, nodes[slot])
+            continue
+        
+        if command == "status":
+            print_status(nodes, cache)
+            continue
+        
+        print(f"Unknown command: {command}")
+        print("Type 'help' for available commands.")
+
+
 def main() -> None:
     """Main entry point."""
     import asyncio
-    asyncio.run(run_cli())
+    args = parse_args()
+    asyncio.run(run_cli_with_config(args))
 
 
 if __name__ == "__main__":
